@@ -1,5 +1,6 @@
 import re
 import argparse
+import os
 import tempfile
 import time
 from pathlib import Path
@@ -28,14 +29,88 @@ def _torch_load_compat(path, *args, **kwargs):
         return _orig_torch_load(path, *args, **kwargs)
 torch.load = _torch_load_compat
 
-# --- Quét folder chứa tất cả checkpoint .pth ---
-CKPT_DIR = Path("dia")
-ckpt_files = sorted([str(p) for p in CKPT_DIR.glob("*.safetensors")] +
-                    [str(p) for p in CKPT_DIR.glob("*.pt")] +
-                    [str(p) for p in CKPT_DIR.glob("*.pth")])
+def load_env_file(env_path: str = ".env") -> None:
+    """
+    Load simple KEY=VALUE entries from a .env file without adding a dependency.
+    Existing environment variables are kept unchanged.
+    """
+    path = Path(env_path)
+    if not path.exists():
+        return
 
-if not ckpt_files:
-    raise RuntimeError(f"No checkpoints found in {CKPT_DIR}")
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        if line.startswith("export "):
+            line = line[len("export "):].strip()
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip("\"'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+def get_hf_token() -> str | None:
+    return (
+        os.environ.get("HF_TOKEN")
+        or os.environ.get("HUGGINGFACE_HUB_TOKEN")
+        or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    )
+
+
+def login_hugging_face_from_env(env_path: str = ".env") -> str | None:
+    load_env_file(env_path)
+    token = get_hf_token()
+    if not token:
+        return None
+
+    from huggingface_hub import login
+
+    login(token=token, add_to_git_credential=False)
+    print(f"Logged in to Hugging Face with token from {env_path}")
+    return token
+
+
+def ensure_local_checkpoint(args) -> None:
+    ckpt_path = Path(args.local_ckpt)
+    config_path = Path(args.config)
+
+    token = login_hugging_face_from_env(args.env_file)
+    if ckpt_path.exists() and config_path.exists():
+        return
+
+    if args.no_auto_download:
+        raise RuntimeError(
+            f"Checkpoint not found: {ckpt_path}. "
+            "Remove --no-auto-download or download model.safetensors manually."
+        )
+    if not token:
+        raise RuntimeError(
+            f"Checkpoint not found: {ckpt_path}. Add HF_TOKEN=hf_... to {args.env_file}, "
+            "accept the gated model on Hugging Face, then run again."
+        )
+
+    from huggingface_hub import snapshot_download
+
+    local_dir = ckpt_path.parent if ckpt_path.parent != Path("") else Path(".")
+    local_dir.mkdir(parents=True, exist_ok=True)
+    print(f"Downloading {args.repo_id} to {local_dir}...")
+    snapshot_download(
+        args.repo_id,
+        local_dir=local_dir,
+        repo_type="model",
+        token=token,
+        allow_patterns=["model.safetensors", "config_inference.json"],
+    )
+
+    if not ckpt_path.exists():
+        raise RuntimeError(f"Download finished, but checkpoint is still missing: {ckpt_path}")
+    if not config_path.exists():
+        raise RuntimeError(f"Download finished, but config is still missing: {config_path}")
+
 
 # Textbox để hiển thị trạng thái load model
 status = gr.Textbox(label="Model Status", interactive=False)
@@ -118,10 +193,14 @@ parser.add_argument("--device", type=str, default=None, help="Force device (e.g.
 parser.add_argument("--share", action="store_true", help="Enable Gradio sharing")
 parser.add_argument("--local_ckpt", type=str, default="dia/model.safetensors", help="path to your local checkpoint")
 parser.add_argument("--config", type=str, default="dia/config_inference.json", help="path to your inference")
+parser.add_argument("--repo-id", type=str, default="cosrigel/dia-finetuning-vnese", help="Hugging Face model repo")
+parser.add_argument("--env-file", type=str, default=".env", help="path to .env file containing HF_TOKEN")
+parser.add_argument("--no-auto-download", action="store_true", help="do not download checkpoint automatically")
 parser.add_argument("--half", type=bool, default=False, help="load model in fp16")
 parser.add_argument("--compile", type=bool, default=False, help="torch compile model")
 
 args = parser.parse_args()
+ensure_local_checkpoint(args)
 
 # Determine device
 if args.device:
@@ -645,4 +724,4 @@ with gr.Blocks(css=css) as demo:
 # --- Launch the App ---
 if __name__ == "__main__":
     print("Launching Gradio interface...")
-    demo.launch(share=True, server_name="0.0.0.0")
+    demo.launch(share=args.share, server_name="0.0.0.0")

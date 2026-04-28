@@ -78,10 +78,10 @@ pip install -e .
 
 ### Bước 3: Tải và cài đặt safetensors
 ```bash
-python -m pip install -U "huggingface_hub[cli]"
-huggingface-cli login --token <Thay bằng hf__ của các bạn vừa sao chép> --add-to-git-credential
-python -c 'from huggingface_hub import snapshot_download; snapshot_download("cosrigel/dia-finetuning-vnese", local_dir="dia", repo_type="model")'
+echo 'HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' > .env
 ```
+Khi chạy app, app sẽ tự đọc token từ `.env`, login Hugging Face, rồi tải `model.safetensors` và `config_inference.json` vào thư mục `dia/` nếu chưa có.
+
 ### Bước 4: chạy inference chờ model load và thưởng thức.
 ```bash
 python app_local.py
@@ -92,6 +92,7 @@ python app_local.py
 + 1000 từ sử dụng cuda, GPU RTX A6000 sẽ mất 79 giây
 
 ```bash
+python app_local.py --device mps
 python app_local.py --device cpu
 ```
 
