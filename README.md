@@ -91,7 +91,8 @@ python app_local.py
 - Nếu chạy trong WSL có NVIDIA GPU, kiểm tra `nvidia-smi` trong WSL trước, rồi cài profile CUDA:
 ```bash
 nvidia-smi
-uv sync --extra cuda --reinstall-package torch --reinstall-package torchaudio
+rm -rf .venv
+uv sync --extra cuda
 uv run --extra cuda python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available()); print(torch.cuda.get_device_name(0))"
 uv run --extra cuda app_local.py --share --device cuda
 ```
