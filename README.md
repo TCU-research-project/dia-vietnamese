@@ -87,11 +87,20 @@ Khi chạy app, app sẽ tự đọc token từ `.env`, login Hugging Face, rồ
 python app_local.py
 ```
 ### NOTE: 
+- Mặc định `uv` cài PyTorch bản CPU trên Linux/Windows để tránh lỗi thiếu CUDA runtime như `libcudart.so.12` hoặc `libcublas.so`.
+- Nếu chạy trong WSL có NVIDIA GPU, kiểm tra `nvidia-smi` trong WSL trước, rồi cài profile CUDA:
+```bash
+nvidia-smi
+uv sync --extra cuda --reinstall-package torch --reinstall-package torchaudio
+uv run --extra cuda python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available()); print(torch.cuda.get_device_name(0))"
+uv run --extra cuda app_local.py --share --device cuda
+```
 - Khuyến khích sử dụng **CUDA** để chạy hoặc nếu sử dụng ( MPS hoặc CPU ) thời gian generate sẽ khá lâu. 
 - Thời gian load đã đo được:
 + 1000 từ sử dụng cuda, GPU RTX A6000 sẽ mất 79 giây
 
 ```bash
+uv run app_local.py --device cpu
 python app_local.py --device mps
 python app_local.py --device cpu
 ```
