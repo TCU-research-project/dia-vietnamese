@@ -208,9 +208,9 @@ class RotaryEmbedding(nn.Module):
 
 
 class KVCache:
-    def __init__(self, num_heads, max_len, head_dim, device, k=None, v=None):
-        self.k = torch.zeros((2, num_heads, max_len, head_dim), device=device) if k is None else k
-        self.v = torch.zeros((2, num_heads, max_len, head_dim), device=device) if v is None else v
+    def __init__(self, num_heads, max_len, head_dim, device, k=None, v=None, dtype: torch.dtype = torch.float32):
+        self.k = torch.zeros((2, num_heads, max_len, head_dim), device=device, dtype=dtype) if k is None else k
+        self.v = torch.zeros((2, num_heads, max_len, head_dim), device=device, dtype=dtype) if v is None else v
         self.current_idx = 0
         self.max_len = max_len
 
@@ -388,6 +388,11 @@ class Attention(nn.Module):
                 else:
                     new_kv_cache = Xk_BxNxSxH, Xv_BxNxSxH
                     attn_k, attn_v = cache.get_kv_for_attention(Xk_BxNxSxH, Xv_BxNxSxH)
+
+        if attn_k.dtype != Xq_BxNxTxH.dtype:
+            attn_k = attn_k.to(dtype=Xq_BxNxTxH.dtype)
+        if attn_v.dtype != Xq_BxNxTxH.dtype:
+            attn_v = attn_v.to(dtype=Xq_BxNxTxH.dtype)
 
         attn_output = F.scaled_dot_product_attention(
             Xq_BxNxTxH,
@@ -694,8 +699,9 @@ class Decoder(nn.Module):
             v_proj = cross_attn_module.v_proj(encoder_out)
 
             k_proj = cross_attn_module.rotary_emb(k_proj, position=src_positions)
-            k = k_proj.transpose(1, 2)
-            v = v_proj.transpose(1, 2)
+            cache_dtype = cross_attn_module.q_proj.weight.dtype
+            k = k_proj.transpose(1, 2).to(dtype=cache_dtype)
+            v = v_proj.transpose(1, 2).to(dtype=cache_dtype)
 
             per_layer_kv_cache.append(
                 KVCache(
@@ -883,6 +889,7 @@ class DiaModel(nn.Module):
                 max_len=T,
                 head_dim=self.decoder.layers[i].self_attention.head_dim,
                 device=device,
+                dtype=self.decoder.layers[i].self_attention.q_proj.weight.dtype,
             )
             for i in range(self.decoder.num_layers)
         ]
