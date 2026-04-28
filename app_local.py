@@ -565,7 +565,7 @@ css = """
 #col-container {max-width: 90%; margin-left: auto; margin-right: auto;}
 """
 # Attempt to load default text from example.txt
-default_text = "[HocEnglishOnline] Quick tip: “small wins” nghĩa là thắng lợi nhỏ; ghi lại để não nhận phần thưởng, động lực sẽ tăng."
+default_text = "[KienThucQuanSu] Thay thế bằng đoạn văn bản cần sinh giọng nói."
 example_txt_path = Path("./example.txt")
 if example_txt_path.exists():
     try:
