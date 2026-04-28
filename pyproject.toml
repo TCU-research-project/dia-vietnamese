@@ -17,8 +17,8 @@ dependencies = [
      "numpy>=2.2.4",
      "pydantic>=2.11.3",
      "soundfile>=0.13.1",
-     "torch>=2.6.0,<2.7.0",
-     "torchaudio>=2.6.0,<2.7.0",
+     "torch>=2.7.0,<2.10.0",
+     "torchaudio>=2.7.0,<2.10.0",
      "triton>=3.2.0 ; sys_platform == 'linux'",
      "triton-windows>=3.2.0.post18 ; sys_platform == 'win32'",
      "transformers>=4.35.0",         
@@ -30,8 +30,8 @@ dependencies = [
 
 [project.optional-dependencies]
 cuda = [
-     "torch>=2.6.0,<2.7.0",
-     "torchaudio>=2.6.0,<2.7.0",
+     "torch>=2.7.0,<2.10.0",
+     "torchaudio>=2.7.0,<2.10.0",
 ]
 
 [build-system]
@@ -60,11 +60,18 @@ lines-after-imports = 2
 
 [tool.uv.sources]
 torch = [
+  { index = "pytorch-cu128", marker = "extra == 'cuda' and (sys_platform == 'linux' or sys_platform == 'win32')" },
   { index = "pytorch-cpu", marker = "extra != 'cuda' and (sys_platform == 'linux' or sys_platform == 'win32')" },
 ]
 torchaudio = [
+  { index = "pytorch-cu128", marker = "extra == 'cuda' and (sys_platform == 'linux' or sys_platform == 'win32')" },
   { index = "pytorch-cpu", marker = "extra != 'cuda' and (sys_platform == 'linux' or sys_platform == 'win32')" },
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
 
 [[tool.uv.index]]
 name = "pytorch-cpu"

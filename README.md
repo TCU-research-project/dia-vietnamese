@@ -96,6 +96,7 @@ uv sync --extra cuda
 uv run --extra cuda python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available()); print(torch.cuda.get_device_name(0))"
 uv run --extra cuda app_local.py --share --device cuda
 ```
+Với RTX 50-series như RTX 5060/5080/5090 (`sm_120`), cần PyTorch CUDA 12.8+; các bản `cu124`/`cu126` có thể nhận GPU nhưng không có kernel tương thích.
 Profile CUDA dùng PyTorch từ PyPI để tự kéo bộ `nvidia-*` runtime đồng bộ. Nếu gặp lỗi `undefined symbol: __nvJitLink...`, xoá `.venv` rồi `uv sync --extra cuda` lại để bỏ các wheel CUDA lệch phiên bản cũ.
 - Khuyến khích sử dụng **CUDA** để chạy hoặc nếu sử dụng ( MPS hoặc CPU ) thời gian generate sẽ khá lâu. 
 - Thời gian load đã đo được:
