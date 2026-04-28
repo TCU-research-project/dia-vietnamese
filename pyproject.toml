@@ -32,19 +32,6 @@ dependencies = [
 cuda = [
      "torch>=2.6.0,<2.7.0",
      "torchaudio>=2.6.0,<2.7.0",
-     "nvidia-cublas-cu12>=12.6,<12.7 ; sys_platform == 'linux'",
-     "nvidia-cuda-cupti-cu12>=12.6,<12.7 ; sys_platform == 'linux'",
-     "nvidia-cuda-nvrtc-cu12>=12.6,<12.7 ; sys_platform == 'linux'",
-     "nvidia-cuda-runtime-cu12>=12.6,<12.7 ; sys_platform == 'linux'",
-     "nvidia-cudnn-cu12>=9.5,<10 ; sys_platform == 'linux'",
-     "nvidia-cufft-cu12>=11,<12 ; sys_platform == 'linux'",
-     "nvidia-curand-cu12>=10.3,<11 ; sys_platform == 'linux'",
-     "nvidia-cusolver-cu12>=11.7,<12 ; sys_platform == 'linux'",
-     "nvidia-cusparse-cu12>=12.5,<13 ; sys_platform == 'linux'",
-     "nvidia-cusparselt-cu12>=0.6,<0.7 ; sys_platform == 'linux'",
-     "nvidia-nccl-cu12>=2.21,<3 ; sys_platform == 'linux'",
-     "nvidia-nvjitlink-cu12>=12.6,<12.7 ; sys_platform == 'linux'",
-     "nvidia-nvtx-cu12>=12.6,<12.7 ; sys_platform == 'linux'",
 ]
 
 [build-system]
@@ -73,18 +60,11 @@ lines-after-imports = 2
 
 [tool.uv.sources]
 torch = [
-  { index = "pytorch-cu126", marker = "extra == 'cuda' and (sys_platform == 'linux' or sys_platform == 'win32')" },
   { index = "pytorch-cpu", marker = "extra != 'cuda' and (sys_platform == 'linux' or sys_platform == 'win32')" },
 ]
 torchaudio = [
-  { index = "pytorch-cu126", marker = "extra == 'cuda' and (sys_platform == 'linux' or sys_platform == 'win32')" },
   { index = "pytorch-cpu", marker = "extra != 'cuda' and (sys_platform == 'linux' or sys_platform == 'win32')" },
 ]
-
-[[tool.uv.index]]
-name = "pytorch-cu126"
-url = "https://download.pytorch.org/whl/cu126"
-explicit = true
 
 [[tool.uv.index]]
 name = "pytorch-cpu"

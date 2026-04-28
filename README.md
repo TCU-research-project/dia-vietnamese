@@ -96,6 +96,7 @@ uv sync --extra cuda
 uv run --extra cuda python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available()); print(torch.cuda.get_device_name(0))"
 uv run --extra cuda app_local.py --share --device cuda
 ```
+Profile CUDA dùng PyTorch từ PyPI để tự kéo bộ `nvidia-*` runtime đồng bộ. Nếu gặp lỗi `undefined symbol: __nvJitLink...`, xoá `.venv` rồi `uv sync --extra cuda` lại để bỏ các wheel CUDA lệch phiên bản cũ.
 - Khuyến khích sử dụng **CUDA** để chạy hoặc nếu sử dụng ( MPS hoặc CPU ) thời gian generate sẽ khá lâu. 
 - Thời gian load đã đo được:
 + 1000 từ sử dụng cuda, GPU RTX A6000 sẽ mất 79 giây
