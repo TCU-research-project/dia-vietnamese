@@ -98,6 +98,29 @@ uv run --extra cuda app_local.py --share --device cuda
 ```
 Với RTX 50-series như RTX 5060/5080/5090 (`sm_120`), cần PyTorch CUDA 12.8+; các bản `cu124`/`cu126` có thể nhận GPU nhưng không có kernel tương thích.
 Profile CUDA dùng PyTorch từ PyPI để tự kéo bộ `nvidia-*` runtime đồng bộ. Nếu gặp lỗi `undefined symbol: __nvJitLink...`, xoá `.venv` rồi `uv sync --extra cuda` lại để bỏ các wheel CUDA lệch phiên bản cũ.
+Nếu gặp lỗi `unable to mmap ... model.safetensors: Cannot allocate memory`, hãy chuyển repo/model khỏi `/mnt/c` hoặc `/mnt/d` sang filesystem Linux của WSL và tăng RAM/swap cho WSL:
+```powershell
+# Chạy trong Windows PowerShell
+notepad $env:USERPROFILE\.wslconfig
+```
+Nội dung gợi ý:
+```ini
+[wsl2]
+memory=32GB
+swap=64GB
+```
+Sau đó:
+```powershell
+wsl --shutdown
+```
+Mở lại WSL rồi kiểm tra `free -h`. Khuyến nghị đặt project ở `~/dia-vietnamese` thay vì `/mnt/d/dia-vietnamese`.
+Máy 8GB RAM vẫn rất căng cho Dia 1.6B. Bắt buộc chạy CUDA fp16 và loader streaming:
+```bash
+cd ~/dia-vietnamese
+free -h
+uv run --extra cuda app_local.py --share --device cuda --half True
+```
+Nếu vẫn fail mmap trên máy 8GB, thực tế nên dùng máy có RAM lớn hơn, cloud GPU, hoặc Hugging Face Space; CPU/offload với swap lớn có thể load được nhưng sẽ rất chậm.
 - Khuyến khích sử dụng **CUDA** để chạy hoặc nếu sử dụng ( MPS hoặc CPU ) thời gian generate sẽ khá lâu. 
 - Thời gian load đã đo được:
 + 1000 từ sử dụng cuda, GPU RTX A6000 sẽ mất 79 giây

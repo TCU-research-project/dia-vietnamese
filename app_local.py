@@ -15,6 +15,7 @@ from dia.config import DiaConfig
 from dia.layers import DiaModel
 import dac
 import safetensors.torch as st
+from safetensors import safe_open
 from safetensors.torch import load_file as safe_load_file  
 
 # --- Patch PyTorch 2.6: đảm bảo torch.load không dùng weights_only=True mặc định ---
@@ -24,10 +25,86 @@ def _torch_load_compat(path, *args, **kwargs):
     Load checkpoint tương thích cả .pt/.pth và .safetensors
     """
     if isinstance(path, str) and path.endswith(".safetensors"):
-        return st.load_file(path)
+        try:
+            return st.load_file(path)
+        except RuntimeError as e:
+            msg = str(e)
+            if "unable to mmap" in msg or "Cannot allocate memory" in msg:
+                raise RuntimeError(
+                    "Unable to memory-map the safetensors checkpoint. "
+                    "This usually means WSL does not have enough RAM/swap for the 6.44GB model, "
+                    "or the checkpoint is being loaded from a Windows-mounted path like /mnt/c or /mnt/d. "
+                    "Move the repo/checkpoint into the WSL Linux filesystem (for example ~/dia-vietnamese) "
+                    "and increase WSL memory/swap in %USERPROFILE%\\.wslconfig."
+                ) from e
+            raise
     else:
         return _orig_torch_load(path, *args, **kwargs)
 torch.load = _torch_load_compat
+
+
+def parse_bool(value: str | bool) -> bool:
+    if isinstance(value, bool):
+        return value
+    value = value.lower()
+    if value in {"1", "true", "yes", "y", "on"}:
+        return True
+    if value in {"0", "false", "no", "n", "off"}:
+        return False
+    raise argparse.ArgumentTypeError(f"Expected a boolean value, got {value!r}")
+
+
+def normalize_state_key(key: str) -> str:
+    key = key.replace("module.", "")
+    if key.startswith("model."):
+        key = key[6:]
+    return key
+
+
+def load_safetensors_streaming(module: torch.nn.Module, checkpoint_path: str, strict: bool = True) -> None:
+    """
+    Load safetensors one tensor at a time to avoid materializing the full state_dict in RAM.
+    This is important for WSL machines with small system memory.
+    """
+    target_state = module.state_dict()
+    missing = set(target_state.keys())
+    unexpected: list[str] = []
+
+    try:
+        with safe_open(checkpoint_path, framework="pt", device="cpu") as f:
+            for raw_key in f.keys():
+                key = normalize_state_key(raw_key)
+                if key not in target_state:
+                    unexpected.append(raw_key)
+                    continue
+
+                tensor = f.get_tensor(raw_key)
+                target = target_state[key]
+                if tensor.shape != target.shape:
+                    raise RuntimeError(
+                        f"Shape mismatch for {key}: checkpoint {tuple(tensor.shape)} != model {tuple(target.shape)}"
+                    )
+
+                target.copy_(tensor.to(dtype=target.dtype))
+                missing.discard(key)
+                del tensor
+    except RuntimeError as e:
+        msg = str(e)
+        if "unable to mmap" in msg or "Cannot allocate memory" in msg:
+            raise RuntimeError(
+                "Unable to memory-map the safetensors checkpoint. "
+                "On an 8GB RAM WSL machine, move the project to the WSL Linux filesystem "
+                "(for example ~/dia-vietnamese), set a large WSL swap in %USERPROFILE%\\.wslconfig, "
+                "and run with --device cuda --half True."
+            ) from e
+        raise
+
+    if strict and (missing or unexpected):
+        raise RuntimeError(
+            f"Error loading checkpoint: missing={len(missing)} unexpected={len(unexpected)}"
+        )
+
+    print(f"[load] streaming safetensors complete: missing={len(missing)} unexpected={len(unexpected)}")
 
 def load_env_file(env_path: str = ".env") -> None:
     """
@@ -196,8 +273,9 @@ parser.add_argument("--config", type=str, default="dia/config_inference.json", h
 parser.add_argument("--repo-id", type=str, default="cosrigel/dia-finetuning-vnese", help="Hugging Face model repo")
 parser.add_argument("--env-file", type=str, default=".env", help="path to .env file containing HF_TOKEN")
 parser.add_argument("--no-auto-download", action="store_true", help="do not download checkpoint automatically")
-parser.add_argument("--half", type=bool, default=False, help="load model in fp16")
-parser.add_argument("--compile", type=bool, default=False, help="torch compile model")
+parser.add_argument("--half", type=parse_bool, nargs="?", const=True, default=True, help="load model in fp16 on CUDA")
+parser.add_argument("--no-half", dest="half", action="store_false", help="disable fp16 model loading")
+parser.add_argument("--compile", type=parse_bool, nargs="?", const=True, default=False, help="torch compile model")
 
 args = parser.parse_args()
 ensure_local_checkpoint(args)
@@ -249,9 +327,13 @@ try:
     if getattr(args, "compile", False) and device.type == "cuda":
         ptmodel = torch.compile(ptmodel, backend="inductor")
 
-    # Tải state ở CPU rồi chuyển device
-    state = _torch_load_compat(args.local_ckpt, map_location="cpu")
-    ptmodel.load_state_dict(state["model"] if "model" in state else state, strict=True)
+    # Tải checkpoint ít peak RAM nhất có thể.
+    if str(args.local_ckpt).endswith(".safetensors"):
+        load_safetensors_streaming(ptmodel, args.local_ckpt, strict=True)
+    else:
+        state = _torch_load_compat(args.local_ckpt, map_location="cpu")
+        ptmodel.load_state_dict(state["model"] if "model" in state else state, strict=True)
+        del state
 
     print("✅ Model loaded successfully! Please wait...")
     ptmodel = ptmodel.to(device).eval()
