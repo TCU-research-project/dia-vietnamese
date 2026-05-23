@@ -17,6 +17,8 @@ import dac
 import safetensors.torch as st
 from safetensors import safe_open
 from safetensors.torch import load_file as safe_load_file  
+from huggingface_hub import login
+
 
 # --- Patch PyTorch 2.6: đảm bảo torch.load không dùng weights_only=True mặc định ---
 _orig_torch_load = torch.load
@@ -164,9 +166,6 @@ def login_hugging_face_from_env(env_path: str = ".env") -> str | None:
     token = get_hf_token()
     if not token:
         return None
-
-    from huggingface_hub import login
-
     login(token=token, add_to_git_credential=False)
     print(f"Logged in to Hugging Face with token from {env_path}")
     return token
