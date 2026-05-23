@@ -226,15 +226,15 @@ class KVCache:
 
     def update_cache(self, k, v):
         assert self.current_idx < self.max_len
-        self.k[:, :, self.current_idx : self.current_idx + 1, :] = k
-        self.v[:, :, self.current_idx : self.current_idx + 1, :] = v
+        self.k[:, :, self.current_idx : self.current_idx + 1, :] = k.to(dtype=self.k.dtype)
+        self.v[:, :, self.current_idx : self.current_idx + 1, :] = v.to(dtype=self.v.dtype)
         self.current_idx += 1
 
     def prefill_kv(self, k, v):
         prefill_len = k.shape[2]
         assert prefill_len <= self.max_len
-        self.k[:, :, :prefill_len, :] = k
-        self.v[:, :, :prefill_len, :] = v
+        self.k[:, :, :prefill_len, :] = k.to(dtype=self.k.dtype)
+        self.v[:, :, :prefill_len, :] = v.to(dtype=self.v.dtype)
         self.current_idx = prefill_len
 
 

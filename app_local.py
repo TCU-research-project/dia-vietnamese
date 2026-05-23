@@ -106,6 +106,27 @@ def load_safetensors_streaming(module: torch.nn.Module, checkpoint_path: str, st
 
     print(f"[load] streaming safetensors complete: missing={len(missing)} unexpected={len(unexpected)}")
 
+
+def prepare_runtime_config(cfg: DiaConfig, use_half: bool, runtime_device: torch.device) -> DiaConfig:
+    """
+    Keep activation and weight precision aligned with the runtime model.
+
+    `config_inference.json` is fp32 by default, but CUDA inference can cast the
+    module weights to fp16. If the config still asks layers to emit fp32
+    activations, cross-attention can build fp32 K/V caches while decoder queries
+    are fp16, which breaks scaled_dot_product_attention.
+    """
+    if not (use_half and runtime_device.type == "cuda"):
+        return cfg
+
+    return cfg.model_copy(
+        update={
+            "training": cfg.training.model_copy(update={"dtype": "float16"}),
+            "model": cfg.model.model_copy(update={"weight_dtype": "float16"}),
+        }
+    )
+
+
 def load_env_file(env_path: str = ".env") -> None:
     """
     Load simple KEY=VALUE entries from a .env file without adding a dependency.
@@ -316,6 +337,7 @@ print("Loading Nari model...")
 
 try:
     cfg = DiaConfig.load(args.config if getattr(args, "config", None) else "dia/config.json")
+    cfg = prepare_runtime_config(cfg, getattr(args, "half", False), device)
 
     ptmodel = DiaModel(cfg)
 

@@ -503,13 +503,14 @@ class Dia:
         )
 
         decoder_self_attention_cache: list[KVCache] = []
-        for _ in range(self.model.decoder.num_layers):
+        for layer in self.model.decoder.layers:
             decoder_self_attention_cache.append(
                 KVCache(
                     self.config.model.decoder.gqa_query_heads,
                     max_tokens,
                     self.config.model.decoder.gqa_head_dim,
                     self.device,
+                    dtype=layer.self_attention.q_proj.weight.dtype,
                 )
             )
 
